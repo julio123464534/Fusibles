@@ -1,0 +1,71 @@
+# grafica_corriente_resistencia.py
+# Genera una gráfica I vs R con ajustes de curva (recíproca, potencia, polinomio grado 2)
+# Datos: R = [1,2,3,4,5]  I = [8.48, 4.366, 3.94, 2.216, 1.778]
+
+import numpy as np
+import matplotlib.pyplot as plt
+from math import sqrt
+
+# --- Datos proporcionados ---
+R = np.array([1, 2, 3, 4, 5], dtype=float)
+I = np.array([8.48, 4.366, 3.94, 2.216, 1.778], dtype=float)
+
+# --- 1) Ajuste recíproco (lineal en 1/R): I = a*(1/R) + b ---
+X_inv = 1.0 / R
+a_rec, b_rec = np.polyfit(X_inv, I, 1)  # coeficientes [a, b]
+def I_rec(Rv): return a_rec * (1.0/Rv) + b_rec
+
+# --- 2) Ajuste ley de potencia: I = A * R^B  (log-log fit) ---
+log_coef = np.polyfit(np.log(R), np.log(I), 1)  # [B, log(A)]
+B_pow = log_coef[0]
+A_pow = np.exp(log_coef[1])
+def I_pow(Rv): return A_pow * (Rv**B_pow)
+
+# --- 3) Ajuste polinómico grado 2: I = c2*R^2 + c1*R + c0 ---
+coeffs_poly2 = np.polyfit(R, I, 2)  # [c2, c1, c0]
+def I_poly2(Rv):
+    return coeffs_poly2[0]*Rv**2 + coeffs_poly2[1]*Rv + coeffs_poly2[2]
+
+# --- Rango para graficar la curva suave (puedes cambiar a 1..10) ---
+R_grid = np.linspace(1, 10, 400)
+
+# Predicciones en puntos originales (para calcular errores)
+I_rec_pred = I_rec(R)
+I_pow_pred = I_pow(R)
+I_poly2_pred = I_poly2(R)
+
+I_rec_grid = I_rec(R_grid)
+I_pow_grid = I_pow(R_grid)
+I_poly2_grid = I_poly2(R_grid)
+
+# RMSE
+def rmse(true, pred):
+    return sqrt(np.mean((np.array(true) - np.array(pred))**2))
+
+rmse_rec = rmse(I, I_rec_pred)
+rmse_pow = rmse(I, I_pow_pred)
+rmse_poly2 = rmse(I, I_poly2_pred)
+
+# --- Imprimir resumen de parámetros ---
+print("Resumen de ajustes:")
+print(f"Recíproca: I = a*(1/R) + b    -> a = {a_rec:.6f}, b = {b_rec:.6f}, RMSE = {rmse_rec:.6f} A")
+print(f"Ley de potencia: I = A * R^B  -> A = {A_pow:.6f}, B = {B_pow:.6f}, RMSE = {rmse_pow:.6f} A")
+print(f"Polinomio grado 2 coefs (c2, c1, c0) = ({coeffs_poly2[0]:.6f}, {coeffs_poly2[1]:.6f}, {coeffs_poly2[2]:.6f}), RMSE = {rmse_poly2:.6f} A")
+
+# --- Graficar ---
+plt.figure(figsize=(9,6))
+plt.scatter(R, I, marker='x', s=80, label="Datos (medidos)", zorder=5)
+plt.plot(R_grid, I_rec_grid, label=f"Recíproca: a*(1/R)+b  (RMSE={rmse_rec:.3f} A)")
+plt.plot(R_grid, I_pow_grid, label=f"Ley potencia: A*R^B  (RMSE={rmse_pow:.3f} A)")
+plt.plot(R_grid, I_poly2_grid, label=f"Polinomio grado 2  (RMSE={rmse_poly2:.3f} A)")
+plt.xlabel("Resistencia R (Ω)")
+plt.ylabel("Corriente I (A)")
+plt.title("Corriente vs Resistencia — Ajustes de curva")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+
+# Guarda la figura si quieres (descomenta la línea siguiente)
+# plt.savefig("corriente_vs_resistencia.png", dpi=300)
+
+plt.show()
