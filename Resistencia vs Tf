@@ -1,0 +1,73 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from math import sqrt, exp
+
+# Datos
+R = np.array([1, 2, 3, 4, 5], dtype=float)
+t = np.array([0.098, 0.408, 1.0, 2.6, 7.5], dtype=float)  # segundos
+
+# Validación básica
+if np.any(R <= 0) or np.any(t <= 0):
+    raise ValueError("R y t deben ser positivos para los ajustes logarítmicos.")
+
+# Ajuste 1: Ley de potencia t = A * R^B  (log-log)
+B_pow, logA_pow = np.polyfit(np.log(R), np.log(t), 1)
+A_pow = np.exp(logA_pow)
+def t_pow(Rv): return A_pow * (Rv**B_pow)
+
+# Ajuste 2: Exponencial t = A * exp(B*R)  -> ln(t) = ln(A) + B*R
+B_exp, logA_exp = np.polyfit(R, np.log(t), 1)
+A_exp = np.exp(logA_exp)
+def t_exp(Rv): return A_exp * np.exp(B_exp * Rv)
+
+# Ajuste 3: Polinomio grado 2
+coeffs_poly2 = np.polyfit(R, t, 2)
+def t_poly2(Rv): return coeffs_poly2[0]*Rv**2 + coeffs_poly2[1]*Rv + coeffs_poly2[2]
+
+# RMSE en los puntos originales
+def rmse(y_true, y_pred): return sqrt(np.mean((np.array(y_true) - np.array(y_pred))**2))
+
+rm_pow = rmse(t, t_pow(R))
+rm_exp = rmse(t, t_exp(R))
+rm_poly = rmse(t, t_poly2(R))
+
+# Resumen de parámetros y errores
+print("Ajustes y RMSEs:")
+print(f"Ley potencia: t = A*R^B  -> A = {A_pow:.6f}, B = {B_pow:.6f}, RMSE = {rm_pow:.6f} s")
+print(f"Exponencial:  t = A*exp(B*R) -> A = {A_exp:.6f}, B = {B_exp:.6f}, RMSE = {rm_exp:.6f} s")
+print(f"Polinomio2: coeffs (c2,c1,c0) = ({coeffs_poly2[0]:.6f}, {coeffs_poly2[1]:.6f}, {coeffs_poly2[2]:.6f}), RMSE = {rm_poly:.6f} s")
+
+# Elegir mejor modelo según RMSE
+rmses = {"potencia": rm_pow, "exponencial": rm_exp, "poly2": rm_poly}
+best_model_name = min(rmses, key=rmses.get)
+print("Mejor modelo según RMSE:", best_model_name)
+
+# Graficar
+R_grid = np.linspace(1, 8, 400)  # extender hasta 8 ohm para visualizar extrapolación
+t_pow_grid = t_pow(R_grid)
+t_exp_grid = t_exp(R_grid)
+t_poly2_grid = t_poly2(R_grid)
+
+plt.figure(figsize=(9,6))
+plt.scatter(R, t, marker='x', s=80, label="Datos (medidos)", zorder=5)
+plt.plot(R_grid, t_pow_grid, label=f"Ley potencia (RMSE={rm_pow:.3f} s)")
+plt.plot(R_grid, t_exp_grid, label=f"Exponencial (RMSE={rm_exp:.3f} s)")
+plt.plot(R_grid, t_poly2_grid, label=f"Polinomio grado 2 (RMSE={rm_poly:.3f} s)")
+
+# Resaltar el mejor modelo en línea más gruesa
+if best_model_name == "potencia":
+    plt.plot(R_grid, t_pow_grid, linewidth=3, label="Mejor: Potencia", zorder=6)
+elif best_model_name == "exponencial":
+    plt.plot(R_grid, t_exp_grid, linewidth=3, label="Mejor: Exponencial", zorder=6)
+else:
+    plt.plot(R_grid, t_poly2_grid, linewidth=3, label="Mejor: Polinomio2", zorder=6)
+
+plt.xlabel("Resistencia R (Ω)")
+plt.ylabel("Tiempo de fusión (s)")
+plt.title("Tiempo de fusión de fusible vs Resistencia")
+plt.ylim(0, 8)  # límite vertical según pediste 0..8 s (mostrando 98 ms como ~0.098 s)
+plt.xlim(0.8, 8.2)
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
